@@ -3,6 +3,13 @@ Flask Example - Get To Know : Global Voices
 
 Small example Flask applicaton for the MAS.s60 course.
 
+This example was modified to cache the stories form each country using MongoDB.
+A caching class was added to cache before each time stories for a country are retrieved.
+The user can adjust the TTL of each record when constructing the caching class.
+
+
+
+
 Installation
 ------------
 
