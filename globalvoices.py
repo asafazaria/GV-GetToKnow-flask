@@ -46,13 +46,13 @@ class StoriesCache(object):
             del  story['country']
         return stories_list
     
-    def has_valid_stories(self, country, threashold):
+    def has_valid_stories(self, country, threshold):
         documents = self.cache_data.find({'country':country})
         if documents.count() == 0:
             return False
         currnet_time = time.time()
         for story in documents:
-            if currnet_time - story['timestamp'] > threashold:
+            if currnet_time - story['timestamp'] > threshold:
                 return False
         return True
     
@@ -69,6 +69,10 @@ f = open(basedir+'/globalvoices-countrypaths.json', 'r')
 path_lookup = json.loads(f.read())
 
 # initialise the mongodb cache
+
+# Notice: before using locally one must run mongodb as a server on the localhost or change to configuration to represent her own server.
+# I tested it with several instances of the web app accessing the same server and it seems to work well. Notice that if the threshold is not the same
+# between all clients one client might erase records faster than another one intends to.
 stories_cache = StoriesCache(None, None,'stories_cache', 'stories_collection', 50000)
     
 def recent_stories_from(country):
