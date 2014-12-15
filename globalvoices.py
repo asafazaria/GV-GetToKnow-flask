@@ -4,6 +4,62 @@ import feedparser
 import urllib
 from urllib2 import urlopen
 import HTMLParser
+import pymongo
+import time
+
+
+class StoriesCache(object):
+    
+    def __init__(self, server_host, server_port, data_base_name, collection_name, validity_threashold):
+        self.validity_threashold = validity_threashold
+        self.server_port = server_port
+        self.data_base_name = data_base_name
+        self.collection_name = collection_name
+        
+        if (server_port is None) or (server_host is None):
+            self.server_connection = pymongo.MongoClient()
+        else:
+            self.server_connection = pymongo.MongoClient(server_host,server_port)
+        
+        self.cache_data = self.server_connection[data_base_name][collection_name]
+        
+    def store_stories_for_country(self, country, stories):
+        current_time_stamp = time.time()
+        for story in stories:
+            document_to_cache = dict(story)
+            document_to_cache['country'] = country
+            document_to_cache['timestamp'] = current_time_stamp
+            self.cache_data.insert(document_to_cache)
+    
+    def retrieve_stories_for_country(self, country, invalid_callback):
+        
+        if not self.has_valid_stories(country, self.validity_threashold):
+            self.clear_stories_for_county(country)
+            stories = invalid_callback(country)
+            self.store_stories_for_country(country, stories)
+            return stories
+        
+        documents = self.cache_data.find({'country':country})
+        stories_list = list(documents)
+        for story in stories_list:
+            del  story['timestamp']       
+            del  story['country']
+        return stories_list
+    
+    def has_valid_stories(self, country, threashold):
+        documents = self.cache_data.find({'country':country})
+        if documents.count() == 0:
+            return False
+        currnet_time = time.time()
+        for story in documents:
+            if currnet_time - story['timestamp'] > threashold:
+                return False
+        return True
+    
+    def clear_stories_for_county(self, country):
+        self.cache_data.remove({'country':country})
+
+
 
 # figure out what dir we are in (needed to load other files when deploying to a server)
 basedir = os.path.dirname(os.path.abspath(__file__))
@@ -12,7 +68,13 @@ basedir = os.path.dirname(os.path.abspath(__file__))
 f = open(basedir+'/globalvoices-countrypaths.json', 'r')
 path_lookup = json.loads(f.read())
 
+# initialise the mongodb cache
+stories_cache = StoriesCache(None, None,'stories_cache', 'stories_collection', 50000)
+    
 def recent_stories_from(country):
+    return stories_cache.retrieve_stories_for_country(country, recent_stories_from_generator)
+
+def recent_stories_from_generator(country):
     '''
     Return a list of the last 3 stories for a given country
     '''
